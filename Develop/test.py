@@ -1,8 +1,6 @@
-from win32api import GetMonitorInfo, MonitorFromPoint
+import pyautogui
+from time import sleep
 
-def screen_size():
-    monitor_info = GetMonitorInfo(MonitorFromPoint((0,0)))
-    work_area = monitor_info.get("Work")
-    return (work_area[2],work_area[3])
-
-print(screen_size())
+while True:
+    sleep(1)
+    print(pyautogui.position().x,pyautogui.position().y)
