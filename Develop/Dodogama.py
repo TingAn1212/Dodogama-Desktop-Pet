@@ -43,11 +43,24 @@ def time_range(r1,r2,round,mode):
 def mouse_pos():
     pos = GetCursorPos()
     return (pos[0]-100,pos[1]-100)
+def cycle(arr):
+    res = []
+    last = None
+    first = True
+    for item in arr:
+        if first:
+            first = False
+            last = item
+        else:
+            res.append(item)
+    res.append(last)
+    return res
 
 #global
 root = Tk()
 max = screen_size()
-speed = max[0]//200
+base = screen_size()[1] - 180
+speed = max[0]//400
 start_x = r.choice(range(0,max[0]-200))
 pos = [start_x,max[1]-180]
 
@@ -74,6 +87,7 @@ class Show_tray(threading.Thread):
 class Action:
     def __init__(self,name):
         self.Name = name
+        self.displace = 0
         self.img_q = []
         self.move_q = []
         self.round = 0
@@ -88,6 +102,10 @@ class Action:
             self.idle()
         if self.Name == "eat":
             self.eat()
+        if self.Name == "lift":
+            self.lift()
+        if self.Name == "fall":
+            self.fall()
     def move(self):
         global pos
         range_x = [pos[0]+1,max[0]-200-pos[0]]
@@ -97,35 +115,36 @@ class Action:
                 num = distance//speed
                 for i in range(num):
                     self.move_q.append(-1*speed)
-                for i in range(num//10):
+                for i in range(num//20):
                     self.img_q += assets["move_left"]
-                self.img_q += assets["move_left"][:num%10]
+                self.img_q += assets["move_left"][:num%20]
             else:
                 distance = r.choice(range(100,range_x[1]))
                 num = distance//speed
                 for i in range(num):
                     self.move_q.append(speed)
-                for i in range(num//10):
+                for i in range(num//20):
                     self.img_q += assets["move_right"]
-                self.img_q += assets["move_right"][:num%10]
+                self.img_q += assets["move_right"][:num%20]
         else:
             if range_x[0] < 100:
                 distance = r.choice(range(100,range_x[1]))
                 num = distance//speed
                 for i in range(num):
                     self.move_q.append(speed)
-                for i in range(num//10):
+                for i in range(num//20):
                     self.img_q += assets["move_right"]
-                self.img_q += assets["move_right"][:num%10]
+                self.img_q += assets["move_right"][:num%20]
             else:
                 distance = r.choice(range(100,range_x[0]))
                 num = distance//speed
                 for i in range(num):
                     self.move_q.append(-1*speed)
-                for i in range(num//10):
+                for i in range(num//20):
                     self.img_q += assets["move_left"]
-                self.img_q += assets["move_left"][:num%10]
+                self.img_q += assets["move_left"][:num%20]
     def sleep(self,full=False):
+        self.displace = 20
         if full:
             dur = 10
             rounds = int((dur*60*20)/40)
@@ -138,6 +157,7 @@ class Action:
             for i in range(rounds):
                 self.img_q += assets["sleep_right"]
     def dance(self):
+        self.displace = -48
         rounds = r.choice(time_range(5,10,20,"sec"))
         for i in range(rounds):
             self.img_q += assets["dance"]
@@ -161,6 +181,13 @@ class Action:
         else:
             for i in range(rounds):
                 self.img_q += assets["eat_right"]
+    def lift(self):
+        if r.choice([0,1]) == 0:
+            self.img_q += assets["pickup_left"] 
+        else:
+            self.img_q += assets["pickup_right"]
+    def fall(self):
+        self.img_q += assets["fall"]
     def get_img(self):
         if len(self.img_q) > 0:
             return self.img_q[0]
@@ -172,6 +199,10 @@ class Action:
         else:
             return 0
     def advance(self):
+        if self.Name == "lift" or self.Name == "fall":
+            self.img_q = cycle(self.img_q)
+            self.round += 1
+            return 0
         if len(self.img_q) > 0:
             self.previous = self.img_q[0]
             self.img_q.pop(0)
@@ -180,7 +211,9 @@ class Action:
         self.round += 1
         #print(self.round)
     def can_remove(self):
-        if len(self.img_q) < 1:
+        if len(self.img_q) < 1 and self.Name != "lift":
+            return True
+        elif pos[1] >= base and self.Name == "fall":
             return True
         else:
             return False
@@ -190,8 +223,11 @@ class PET():
         self.obj = obj
         self.action_q = []
         self.previous = None
-    def add_action(self,name):
-        self.action_q.append(Action(name))
+    def add_action(self,name,pre=False):
+        if pre:
+            self.action_q.insert(0,Action(name))
+        else:
+            self.action_q.append(Action(name))
     def get_action(self):
         res = []
         for i in self.action_q:
@@ -207,6 +243,13 @@ class PET():
         player.start()
         self.clear()
         self.add_action("sleep")
+    def lifted(self,x):
+        self.clear()
+        self.add_action("lift",True)
+    def downed(self,x):
+        self.clear()
+        self.add_action("fall",pre=True)
+        self.add_action("idle")
     def advance_move(self,move):
         global pos
         pos[0] = pos[0]+move
@@ -216,6 +259,10 @@ class PET():
         return self.action_q[0].get_img()
     def get_previous(self):
         return self.previous
+    def cancel_lift(self):
+        for i in self.action_q:
+            if i.Name == "lift" or i.Name == "fall":
+                self.action_q.remove(i)
     def update(self):
         global pos
         if len(self.action_q) < 2:
@@ -223,12 +270,6 @@ class PET():
             if c == self.action_q[0].Name:
                 c = r.choice(["sleep","dance","dance","idle","idle","eat","eat"])
             self.add_action(c)
-        if self.action_q[0].Name == "dance":
-            pos[1] = max[1]-132
-        elif self.action_q[0].Name == "sleep":
-            pos[1] = max[1]-200
-        else:
-            pos[1] = max[1]-180
         self.advance_move(self.action_q[0].get_move())
         self.action_q[0].advance()
         if self.action_q[0].can_remove():
@@ -240,15 +281,18 @@ invi = False
 unmute = True
 pet = PET(root)
 assets = {
-    "idle_left":slow(get_img("idle_left",num=2),10),
-    "idle_right":slow(get_img("idle_right",num=2),10),
-    "dance":slow(get_img("dance",dance=True),4),
-    "move_left":slow(get_img("move_left"),2),
-    "move_right":slow(get_img("move_right"),2),
-    "sleep_left":slow(get_img("sleep_left"),8),
-    "sleep_right":slow(get_img("sleep_right"),8),
-    "eat_left":slow(get_img("eat_left"),2),
-    "eat_right":slow(get_img("eat_right"),2),
+    "idle_left":slow(get_img("idle_left",num=2),20),
+    "idle_right":slow(get_img("idle_right",num=2),20),
+    "dance":slow(get_img("dance",dance=True),8),
+    "move_left":slow(get_img("move_left"),4),
+    "move_right":slow(get_img("move_right"),4),
+    "sleep_left":slow(get_img("sleep_left"),16),
+    "sleep_right":slow(get_img("sleep_right"),16),
+    "eat_left":slow(get_img("eat_left"),4),
+    "eat_right":slow(get_img("eat_right"),4),
+    "pickup_left":slow(get_img("pickup_left",num=2),20),
+    "pickup_right":slow(get_img("pickup_right",num=2),20),
+    "fall":slow(get_img("fall",num=4),6),
     "pop":"assets/sound/pop.mp3"}
 
 def main():
@@ -257,8 +301,9 @@ def main():
     pet.add_action("idle")
     label = Label(root,image=assets["idle_left"][0],borderwidth=0)
     label.pack()
-    label.bind("<Button-1>",pet.pressed_move)
-    label.bind("<Button-3>",pet.pressed_sleep)
+    label.bind("<ButtonPress-1>", pet.lifted)
+    label.bind("<ButtonRelease-1>", pet.downed)
+    label.bind("<Button-3>",pet.pressed_move)
     def stop():
         root.quit()
         tray.stop()
@@ -276,7 +321,9 @@ def main():
             unmute = True
         else:
             unmute = False
-    icon = pystray.Icon(name ="Dodogama", icon =icon_img, title ="Dodogama", menu =(pystray.Menu(pystray.MenuItem("hide",show),pystray.MenuItem("mute",mute),pystray.MenuItem("close",stop))))
+    def sleep():
+        pet.action_q[0] = Action("sleep")
+    icon = pystray.Icon(name="Dodogama", icon=icon_img, title="Dodogama", menu=(pystray.Menu(pystray.MenuItem("sleep",sleep),pystray.MenuItem("hide",show),pystray.MenuItem("mute",mute),pystray.MenuItem("close",stop))))
     tray.add(icon)
 
     #config
@@ -287,15 +334,29 @@ def main():
 
     #functions
     def debug():
-        print(mouse_pos())
-        #root.geometry(gen_coord(mouse_pos()))
+        # print(mouse_pos())
+        # print(pos)
+        # print(max,base)
+        # for i in pet.action_q:
+        #     print(i.Name,end=", ")
+        # print("")
+        pass
 
     def update():
+        global pos
         debug()
         pet.update()
+        if pos[1] < base:
+            pos[1] = pos[1]+10
+        if pos[1] > base:
+            pos[1] = base
         label.config(image=pet.display())
-        root.geometry(gen_coord(pos))
-        root.after(50,update)
+        if pet.action_q[0].Name == "lift":
+            root.geometry(gen_coord(mouse_pos()))
+            pos = list(mouse_pos())
+        else:
+            root.geometry(gen_coord((pos[0],pos[1]-pet.action_q[0].displace)))
+        root.after(25,update)
 
     root.after(50,update)
     tray.start()

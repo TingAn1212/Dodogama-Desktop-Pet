@@ -1,6 +1,14 @@
-import pyautogui
-from time import sleep
+def cycle(arr):
+    res = []
+    last = None
+    first = True
+    for item in arr:
+        if first:
+            first = False
+            last = item
+        else:
+            res.append(item)
+    res.append(last)
+    return res
 
-while True:
-    sleep(1)
-    print(pyautogui.position().x,pyautogui.position().y)
+print(cycle([1,2,3]))
