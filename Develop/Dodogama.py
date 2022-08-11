@@ -1,4 +1,4 @@
-#imports
+#imports ---------------------------------------------------------------------------------------------
 from tkinter import *
 import threading
 import pystray
@@ -7,7 +7,7 @@ from win32api import GetMonitorInfo, MonitorFromPoint, GetCursorPos
 from playsound import playsound
 from PIL import ImageTk,Image
 
-#functions
+#functions --------------------------------------------------------------------------------------------
 def screen_size():
     monitor_info = GetMonitorInfo(MonitorFromPoint((0,0)))
     work_area = monitor_info.get("Work")
@@ -56,15 +56,18 @@ def cycle(arr):
     res.append(last)
     return res
 
-#global
+#global variable ------------------------------------------------------------------------------------
 root = Tk()
+anger = 0
 max = screen_size()
 base = screen_size()[1] - 180
 speed = max[0]//400
 start_x = r.choice(range(0,max[0]-200))
 pos = [start_x,max[1]-180]
+invi = False
+unmute = True
 
-#function
+#class ----------------------------------------------------------------------------------------------
 class Sound_play(threading.Thread):
     def __init__(self,path):
         super().__init__()
@@ -94,6 +97,8 @@ class Action:
         self.previous = None
         if self.Name == "move":
             self.move()
+        if self.Name == "yawn":
+            self.yawn()
         if self.Name == "sleep":
             self.sleep()
         if self.Name == "dance":
@@ -106,6 +111,8 @@ class Action:
             self.lift()
         if self.Name == "fall":
             self.fall()
+        if self.Name == "anger":
+            self.anger()
     def move(self):
         global pos
         range_x = [pos[0]+1,max[0]-200-pos[0]]
@@ -143,6 +150,12 @@ class Action:
                 for i in range(num//20):
                     self.img_q += assets["move_left"]
                 self.img_q += assets["move_left"][:num%20]
+    def yawn(self):
+        self.displace = 0
+        if r.choice([0,1]) == 0:
+            self.img_q += assets["yawn_left"]
+        else:
+            self.img_q += assets["yawn_right"]
     def sleep(self,full=False):
         self.displace = 20
         if full:
@@ -188,6 +201,11 @@ class Action:
             self.img_q += assets["pickup_right"]
     def fall(self):
         self.img_q += assets["fall"]
+    def anger(self):
+        if r.choice([0,1]) == 0:
+            self.img_q += assets["anger_left"]
+        else:
+            self.img_q += assets["anger_right"]
     def get_img(self):
         if len(self.img_q) > 0:
             return self.img_q[0]
@@ -209,9 +227,10 @@ class Action:
         if len(self.move_q) > 0:
              self.move_q.pop(0)
         self.round += 1
-        #print(self.round)
     def can_remove(self):
+        global anger
         if len(self.img_q) < 1 and self.Name != "lift":
+            anger = 0
             return True
         elif pos[1] >= base and self.Name == "fall":
             return True
@@ -234,14 +253,22 @@ class PET():
             res.append(i.Name)
         return res
     def pressed_move(self,x):
-        player = Sound_play(assets["pop"])
-        player.start()
-        self.clear()
-        self.add_action("move")
+        global anger
+        anger += 1
+        if anger > 4:
+            self.clear()
+            self.add_action("anger")
+            anger -= 1
+        else:
+            player = Sound_play(assets["pop"])
+            player.start()
+            self.clear()
+            self.add_action("move")
     def pressed_sleep(self,x):
         player = Sound_play(assets["pop"])
         player.start()
         self.clear()
+        self.add_action("yawn")
         self.add_action("sleep")
     def lifted(self,x):
         self.clear()
@@ -269,6 +296,8 @@ class PET():
             c = r.choice(["move","move","move","sleep","dance","dance","idle","idle","eat","eat"])
             if c == self.action_q[0].Name:
                 c = r.choice(["sleep","dance","dance","idle","idle","eat","eat"])
+            if c == "sleep":
+                self.add_action("yawn")
             self.add_action(c)
         self.advance_move(self.action_q[0].get_move())
         self.action_q[0].advance()
@@ -277,8 +306,6 @@ class PET():
             self.action_q.pop(0)
 
 #assets
-invi = False
-unmute = True
 pet = PET(root)
 assets = {
     "idle_left":slow(get_img("idle_left",num=2),20),
@@ -286,6 +313,8 @@ assets = {
     "dance":slow(get_img("dance",dance=True),8),
     "move_left":slow(get_img("move_left"),4),
     "move_right":slow(get_img("move_right"),4),
+    "yawn_left":slow(get_img("yawn_left",4),16),
+    "yawn_right":slow(get_img("yawn_right",4),16),
     "sleep_left":slow(get_img("sleep_left"),16),
     "sleep_right":slow(get_img("sleep_right"),16),
     "eat_left":slow(get_img("eat_left"),4),
@@ -293,6 +322,8 @@ assets = {
     "pickup_left":slow(get_img("pickup_left",num=2),20),
     "pickup_right":slow(get_img("pickup_right",num=2),20),
     "fall":slow(get_img("fall",num=4),6),
+    "anger_left":slow(get_img("angry_left",8),16),
+    "anger_right":slow(get_img("angry_right",8),16),
     "pop":"assets/sound/pop.mp3"}
 
 def main():
@@ -322,17 +353,19 @@ def main():
         else:
             unmute = False
     def sleep():
-        pet.action_q[0] = Action("sleep")
+        pet.clear()
+        pet.add_action("yawn")
+        pet.add_action("sleep")
     icon = pystray.Icon(name="Dodogama", icon=icon_img, title="Dodogama", menu=(pystray.Menu(pystray.MenuItem("sleep",sleep),pystray.MenuItem("hide",show),pystray.MenuItem("mute",mute),pystray.MenuItem("close",stop))))
     tray.add(icon)
 
-    #config
+    #config ------------------------------------------------------------------------------------------
     root.overrideredirect(1) 
     root.geometry(gen_coord((start_x,max[1]-180)))
     root.wm_attributes('-transparentcolor','black')
     root.attributes('-topmost',True)
 
-    #functions
+    #frame update ----------------------------------------------------------------------------------
     def debug():
         # print(mouse_pos())
         # print(pos)
@@ -340,6 +373,7 @@ def main():
         # for i in pet.action_q:
         #     print(i.Name,end=", ")
         # print("")
+        # print(anger)
         pass
 
     def update():

@@ -1,14 +1,12 @@
+from time import sleep
 def cycle(arr):
-    res = []
-    last = None
-    first = True
-    for item in arr:
-        if first:
-            first = False
-            last = item
-        else:
-            res.append(item)
-    res.append(last)
+    res = arr
+    res.append(res[0])
+    res.pop(0)
     return res
 
-print(cycle([1,2,3]))
+item = [".",".",".",".","O"]
+while True:
+    sleep(0.05)
+    print(item)
+    item = cycle(item)
