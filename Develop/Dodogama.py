@@ -164,9 +164,11 @@ class Action:
         else:
             rounds = r.choice(time_range(5,10,40,"min"))
         if r.choice([0,1]) == 0:
+            self.img_q += assets["dig_left"]
             for i in range(rounds):
                 self.img_q += assets["sleep_left"]
         else:
+            self.img_q += assets["dig_right"]
             for i in range(rounds):
                 self.img_q += assets["sleep_right"]
     def dance(self):
@@ -324,6 +326,8 @@ assets = {
     "fall":slow(get_img("fall",num=4),6),
     "anger_left":slow(get_img("angry_left",8),16),
     "anger_right":slow(get_img("angry_right",8),16),
+    "dig_left":slow(get_img("dig_left"),8),
+    "dig_right":slow(get_img("dig_right"),8),
     "pop":"assets/sound/pop.mp3"}
 
 def main():
@@ -370,10 +374,9 @@ def main():
         # print(mouse_pos())
         # print(pos)
         # print(max,base)
-        # for i in pet.action_q:
-        #     print(i.Name,end=", ")
-        # print("")
-        # print(anger)
+        for i in pet.action_q:
+            print(i.Name,anger, end=", ")
+        print("")
         pass
 
     def update():
